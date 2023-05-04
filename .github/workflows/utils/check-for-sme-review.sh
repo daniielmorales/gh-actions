@@ -20,7 +20,7 @@ if [[ -z $SME_REVIEWER ]]; then
 fi
 
 PR_REVIEW_REQUESTS=$(
-  gh pr view $PR_NUMBER --json reviewRequests reviews author
+  gh pr view $PR_NUMBER --json reviewRequests
 )
 
 if [[ -z $PR_REVIEW_REQUESTS ]]; then
