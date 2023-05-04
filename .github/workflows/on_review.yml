@@ -1,0 +1,21 @@
+name: 'On Review'
+on:
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+
+jobs:
+  build:
+    name: SME-Review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Check review status
+        shell: bash
+        run: |
+          ./.github/workflows/utils/check-for-sme-review.sh \
+            "${{ github.repository }}" \
+            "${{ github.event.pull_request.number }}" \
+            "${{ vars.SME }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.github_token }}
