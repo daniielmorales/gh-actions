@@ -1,5 +1,7 @@
 name: 'On Review'
 on:
+  pull_request:
+    branches: ['master']
   pull_request_review:
     types: [submitted, edited, dismissed]
 
