@@ -20,7 +20,7 @@ if [[ -z $SME_REVIEWER ]]; then
 fi
 
 PR_REVIEW_REQUESTS=$(
-  gh pr view https://github.com/$GITHUB_REPOSITORY/pull/$PR_NUMBER --json reviewRequests
+  gh pr view $PR_NUMBER --json reviewRequests reviews author
 )
 
 if [[ -z $PR_REVIEW_REQUESTS ]]; then
@@ -29,7 +29,7 @@ if [[ -z $PR_REVIEW_REQUESTS ]]; then
 fi
 
 PR_SUBMITED_REVIEW=$(
-  gh pr view https://github.com/$GITHUB_REPOSITORY/pull/$PR_NUMBER --json reviews
+  gh pr view $PR_NUMBER --json reviews
 )
 
 if [[ -z $PR_SUBMITED_REVIEW ]]; then
@@ -38,7 +38,7 @@ if [[ -z $PR_SUBMITED_REVIEW ]]; then
 fi
 
 HAD_SME_CREATED=$(
-  gh pr view https://github.com/$GITHUB_REPOSITORY/pull/$PR_NUMBER --json author |
+  gh pr view $PR_NUMBER --json author |
   jq '.[] |
   select(.login=="'"${SME_REVIEWER}"'") != null'
 )
