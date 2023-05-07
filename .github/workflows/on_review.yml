@@ -1,8 +1,7 @@
 name: 'On Review'
 on:
-  pull_request:
-    branches: ['master']
   pull_request_review:
+    branches: ['master']
     types: [submitted, edited, dismissed]
 
 jobs:
@@ -16,7 +15,6 @@ jobs:
         shell: bash
         run: |
           ./.github/workflows/utils/check-for-sme-review.sh \
-            "${{ github.repository }}" \
             "${{ github.event.pull_request.number }}" \
             "${{ vars.SME }}"
         env:
