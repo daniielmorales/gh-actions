@@ -1,11 +1,11 @@
 name: 'On Review'
 on:
   pull_request_review:
-    branches: ['master']
     types: [submitted, edited, dismissed]
 
 jobs:
   build:
+    if: ${{ github.event.pull_request.base.ref == 'master' }}
     name: SME-Review
     runs-on: ubuntu-latest
     steps:
