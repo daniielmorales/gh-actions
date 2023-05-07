@@ -5,3 +5,4 @@
 # Unless a later match takes precedence, @telus/ep-reviewers will be requested 
 # for review when someone opens a pull request.
 *       @andresrguzman
+*       @daniielmorales
