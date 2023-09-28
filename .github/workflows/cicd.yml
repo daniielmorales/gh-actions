@@ -3,7 +3,7 @@ on:
   push:
     branches: ['master', 'develop']
   pull_request:
-    branches: ['master', 'develop', 'jdp-deployment']
+    branches: ['master', 'develop']
 
 jobs:
   test:
