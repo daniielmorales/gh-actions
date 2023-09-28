@@ -23,6 +23,7 @@ jobs:
         run: |
           echo "Deploying to staging done"
   preview:
+    if: github.ref_name == 'master'
     name: Deploy preview
     runs-on: ubuntu-latest
     needs: [staging]
@@ -32,6 +33,7 @@ jobs:
         run: |
           echo "Deploying to preview done"
   production:
+    if: github.ref_name == 'master'
     name: Deploy prod
     runs-on: ubuntu-latest
     needs: [staging]
