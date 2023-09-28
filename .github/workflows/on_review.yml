@@ -1,12 +1,11 @@
 name: 'On Review'
 on:
-  pull_request:
-    branches: ['master']
   pull_request_review:
     types: [submitted, edited, dismissed]
 
 jobs:
   build:
+    if: ${{ github.event.pull_request.base.ref == 'master' }}
     name: SME-Review
     runs-on: ubuntu-latest
     steps:
@@ -16,7 +15,6 @@ jobs:
         shell: bash
         run: |
           ./.github/workflows/utils/check-for-sme-review.sh \
-            "${{ github.repository }}" \
             "${{ github.event.pull_request.number }}" \
             "${{ vars.SME }}"
         env:
