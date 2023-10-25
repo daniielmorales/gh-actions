@@ -12,11 +12,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+  build:
+    if: github.event.pull_request.merged
+    name: Deploy Build
+    runs-on: ubuntu-latest
+    needs: [ test ]
+    steps:
+      - name: Check review status
+        shell: bash
+        run: |
+          echo "Deploying to staging done"
   staging:
     if: github.ref_name == 'develop'
     name: Deploy staging
     runs-on: ubuntu-latest
-    needs: [ test ]
+    needs: [ build ]
     steps:
       - name: Check review status
         shell: bash
@@ -26,7 +36,7 @@ jobs:
     if: github.ref_name == 'master'
     name: Deploy preview
     runs-on: ubuntu-latest
-    needs: [staging]
+    needs: [ build ]
     steps:
       - name: Check review status
         shell: bash
@@ -36,7 +46,7 @@ jobs:
     if: github.ref_name == 'master'
     name: Deploy prod
     runs-on: ubuntu-latest
-    needs: [staging]
+    needs: [ build ]
     steps:
       - name: Check review status
         shell: bash
