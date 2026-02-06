@@ -1,0 +1,112 @@
+name: Create a Jira issue for each Dependabot alert
+
+on:
+  workflow_call:
+    inputs:
+      jira_project:
+        type: string
+        required: true
+        description: 'The Jira project key'
+        default: 'SOD'
+      jira_parent_key:
+        type: string
+        required: true
+        description: 'The Jira parent issue key'
+      assignee_id:
+        type: string
+        description: 'The Jira assignee ID'
+      issue_type:
+        type: string
+        default: 'Bug'
+        description: 'The Jira type of issue'
+    secrets:
+      JIRA_USER_EMAIL:
+        description: 'The Jira user email'
+        required: true
+      JIRA_API_TOKEN:
+        description: 'The Jira API token'
+        required: true
+      DEPENDABOT_GH_PAT:
+        description: 'GitHub Personal Access Token with right scope'
+        required: true 
+
+jobs:
+  getAlerts:
+    runs-on: ubuntu-latest
+    outputs:
+      alerts: ${{ steps.get_alerts.outputs.alerts }}
+    steps:
+      - name: Get Dependabot alerts
+        id: get_alerts
+        run: |
+          bash
+          DEPENDABOT_ALERTS=$(curl -sS -H "Accept: application/vnd.github+json" -H "Authorization: Bearer ${{ secrets.DEPENDABOT_GH_PAT }}" -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/${{vars.REPO}}/dependabot/alerts?state=open" | jq -c .)
+          echo alerts="$(echo "${DEPENDABOT_ALERTS}")" >> $GITHUB_OUTPUT
+
+  fetch_api:
+    needs: getAlerts
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        alert: ${{ fromJson(needs.getAlerts.outputs.alerts) }}
+    steps:
+      - name: generate jql
+        id: generate_jql
+        run: |
+          ENCODED_JQL=$(echo -n "labels=\"${{github.event.repository.name}}\" AND labels=vulnerability AND labels=${{matrix.alert.security_advisory.ghsa_id}}" | jq -sRr @uri)
+          echo -n jql=${ENCODED_JQL} >> $GITHUB_OUTPUT
+
+      - name: Fetch data from API
+        id: current_tickets
+        run: |
+          bash
+          BASIC_AUTH=$(echo -n "${{ secrets.JIRA_USER_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" | base64 | tr -d '\r\n' )
+          RESPONSE=$(curl -sS -H "Authorization: Basic $BASIC_AUTH" "https://${{ vars.JIRA_SERVER }}.atlassian.net/rest/api/3/search/jql?jql=${{ steps.generate_jql.outputs.jql }}")
+          echo response="$(echo "${RESPONSE}")" >> $GITHUB_OUTPUT
+
+      - name: Show fetched data
+        run: |
+          echo "Response: ${{ steps.current_tickets.outputs.response }}"
+
+      - name: Check if ticket exists
+        id: check_ticket
+        run: |
+          RESPONSE='${{ steps.current_tickets.outputs.response }}'
+          echo "Raw response: $RESPONSE"
+
+          # Parse JSON and count issues
+          ISSUES_COUNT=$(echo "$RESPONSE" | jq -r '.issues | length // 0')
+          echo "issues_count=$ISSUES_COUNT" >> $GITHUB_OUTPUT
+          echo "Found $ISSUES_COUNT existing tickets"
+
+          # Log existing ticket keys for debugging
+          if [ "$ISSUES_COUNT" -gt 0 ]; then
+            echo "Existing ticket keys:"
+            echo "$RESPONSE" | jq -r '.issues[].key'
+          fi
+
+          # Set boolean flag
+          if [ "$ISSUES_COUNT" -eq 0 ]; then
+            echo "should_create_ticket=true" >> $GITHUB_OUTPUT
+            echo "✅ No existing tickets found - will create new ticket"
+          else
+            echo "should_create_ticket=false" >> $GITHUB_OUTPUT
+            echo "❌ Found $ISSUES_COUNT existing tickets - will NOT create new ticket"
+          fi
+
+      - name: Create Jira Ticket
+        id: create_jira_ticket
+        if: steps.check_ticket.outputs.should_create_ticket == 'true'
+        run: |
+          BASIC_AUTH=$(echo -n "${{ secrets.JIRA_USER_EMAIL }}:${{ secrets.JIRA_API_TOKEN }}" | base64 | tr -d '\r\n' )
+          RESPONSE=$(curl -sS -H 'Content-Type: application/json' -H "Authorization: Basic $BASIC_AUTH" --data '{"fields": {"project": {"key": "${{ inputs.jira_project }}"}, "summary": "${{github.event.repository.name}} - ${{ matrix.alert.security_advisory.severity }} - ${{ matrix.alert.security_advisory.ghsa_id }}","labels": ["${{github.event.repository.name}}", "vulnerability", "${{ matrix.alert.security_advisory.ghsa_id }}"], "assignee": { "accountId": "${{inputs.assignee_id}}" }, "parent": { "key": "${{inputs.jira_parent_key}}" },"description": {"type": "doc","version": 1,"content": [{"type": "paragraph","content": [{"type": "text","text": "Dependency name: ${{ matrix.alert.dependency.package.name }} \nSeverity: ${{ matrix.alert.security_advisory.severity }} \nGHSA Id: ${{ matrix.alert.security_advisory.ghsa_id }} \nCVE Id: ${{ matrix.alert.security_advisory.cve_id }} \nCreated: ${{ matrix.alert.created_at }} \nUpdated: ${{ matrix.alert.updated_at }} \nSummary: ${{ matrix.alert.security_advisory.summary }} \nURL: ${{ matrix.alert.html_url }}"}]}]},"issuetype": {"name": "${{ inputs.issue_type }}"}}}' "https://${{ vars.JIRA_SERVER }}.atlassian.net/rest/api/3/issue" )
+          JIRA_ERROR=$(echo "$RESPONSE" | jq -r '.errorMessages | length // 0')
+
+          # Log outcome of jira creation
+          if [ "$JIRA_ERROR" -gt 0 ]; then
+            echo "❌ No Jira ticket was created:"
+            echo "$RESPONSE" | jq -r '.errorMessages'
+          else
+            echo "✅ New Jira ticket created:"
+            echo "$RESPONSE" | jq -r '.key'
+          fi
